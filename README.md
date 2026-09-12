@@ -5,21 +5,24 @@ family-facing services with a full Infrastructure-as-Code pipeline —
 built as a portfolio project during a Cloud Support & DevOps bootcamp.
 
 ## Architecture
-                     Proxmox VE Host
-+----------------+
-| debian-template | (VMID 9001, generalized golden image)
-+--------+---------+
-| cloned by Terraform
-v
-+----------------+ +--------------+ +--------------+
-| home-k3s-control| | home-k3s-w1 | | home-k3s-w2 |
-| .241 | | .242 | | .243 |
-+----------------+ +--------------+ +--------------+
-Configured and joined into a K3s cluster by Ansible
 
-+----------------+
-| home-control | Terraform + Ansible + git run here
-| .240 |
+    Proxmox VE Host
+
+    +------------------+
+    | debian-template  |  (VMID 9001, generalized golden image)
+    +---------+--------+
+              | cloned by Terraform
+              v
+    +------------------+  +--------------+  +--------------+
+    | home-k3s-control |  | home-k3s-w1  |  | home-k3s-w2  |
+    |      .241        |  |    .242      |  |    .243      |
+    +------------------+  +--------------+  +--------------+
+         Configured and joined into a K3s cluster by Ansible
+
+    +------------------+
+    |   home-control   |  Terraform + Ansible + git run here
+    |      .240        |
+    +------------------+
 
 ## Tech stack
 
@@ -30,15 +33,16 @@ Configured and joined into a K3s cluster by Ansible
 - **OS:** Debian 13 (Trixie)
 
 ## Repository structure
-homelab-iac/
-├── main.tf # VM resource definitions (3 K3s nodes)
-├── provider.tf # Terraform provider configuration
-├── variables.tf # Input variable declarations
-├── terraform.tfvars # Secrets (gitignored, never committed)
-├── ansible/
-│ ├── inventory.yml # K3s node inventory, grouped by role
-│ └── site.yml # K3s install + cluster join playbook
-└── README.md
+
+    homelab-iac/
+    |-- main.tf              (VM resource definitions, 3 K3s nodes)
+    |-- provider.tf          (Terraform provider configuration)
+    |-- variables.tf         (Input variable declarations)
+    |-- terraform.tfvars     (Secrets - gitignored, never committed)
+    |-- ansible/
+    |   |-- inventory.yml    (K3s node inventory, grouped by role)
+    |   `-- site.yml         (K3s install + cluster join playbook)
+    `-- README.md
 
 ## Key design decisions
 
@@ -74,10 +78,8 @@ homelab-iac/
 
 ## Reproducing this cluster
 
-```bash
-cd ~/homelab-iac
-terraform init
-terraform apply
-cd ansible
-ansible-playbook -i inventory.yml site.yml
-```
+    cd ~/homelab-iac
+    terraform init
+    terraform apply
+    cd ansible
+    ansible-playbook -i inventory.yml site.yml
