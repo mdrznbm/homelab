@@ -1,0 +1,47 @@
+---
+- name: Install and configure K3s control plane
+  hosts: k3s_control
+  become: true
+  tasks:
+    - name: Check if k3s is already installed
+      ansible.builtin.stat:
+        path: /usr/local/bin/k3s
+      register: k3s_installed
+
+    - name: Download and install K3s server
+      ansible.builtin.shell: curl -sfL https://get.k3s.io | sh -
+      when: not k3s_installed.stat.exists
+
+    - name: Wait for node-token file to be created
+      ansible.builtin.wait_for:
+        path: /var/lib/rancher/k3s/server/node-token
+        state: present
+
+    - name: Read the node token
+      ansible.builtin.slurp:
+        src: /var/lib/rancher/k3s/server/node-token
+      register: node_token_raw
+
+    - name: Store the decoded token as a fact
+      ansible.builtin.set_fact:
+        k3s_token: "{{ node_token_raw.content | b64decode | trim }}"
+
+- name: Install and join K3s workers
+  hosts: k3s_workers
+  become: true
+  vars:
+    control_ip: "{{ hostvars['home-k3s-control']['ansible_host'] }}"
+    k3s_token: "{{ hostvars['home-k3s-control']['k3s_token'] }}"
+  tasks:
+    - name: Check if k3s agent is already installed
+      ansible.builtin.stat:
+        path: /usr/local/bin/k3s
+      register: k3s_agent_installed
+
+    - name: Download and install K3s agent, joining the control plane
+      ansible.builtin.shell: >
+        curl -sfL https://get.k3s.io |
+        K3S_URL=https://{{ control_ip }}:6443
+        K3S_TOKEN={{ k3s_token }}
+        sh -
+      when: not k3s_agent_installed.stat.exists

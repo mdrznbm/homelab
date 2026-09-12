@@ -1,0 +1,15 @@
+all:
+  children:
+    k3s_control:
+      hosts:
+        home-k3s-control:
+          ansible_host: 192.168.1.241
+    k3s_workers:
+      hosts:
+        home-k3s-w1:
+          ansible_host: 192.168.1.242
+        home-k3s-w2:
+          ansible_host: 192.168.1.243
+  vars:
+    ansible_user: adm1n
+    ansible_ssh_private_key_file: /home/adm1n/.ssh/cluster_key
