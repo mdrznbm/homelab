@@ -4,7 +4,7 @@ resource "proxmox_virtual_environment_vm" "home_k3s_control" {
   vm_id     = 101
 
   clone {
-    vm_id = 9001
+    vm_id = 9002
   }
 
   cpu {
@@ -51,7 +51,7 @@ resource "proxmox_virtual_environment_vm" "home_k3s_w1" {
   vm_id     = 102
 
   clone {
-    vm_id = 9001
+    vm_id = 9002
   }
 
   cpu {
@@ -98,7 +98,7 @@ resource "proxmox_virtual_environment_vm" "home_k3s_w2" {
   vm_id     = 103
 
   clone {
-    vm_id = 9001
+    vm_id = 9002
   }
 
   cpu {
