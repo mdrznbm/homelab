@@ -5,28 +5,21 @@ family-facing services with a full Infrastructure-as-Code pipeline —
 built as a portfolio project during a Cloud Support & DevOps bootcamp.
 
 ## Architecture
+                     Proxmox VE Host
++----------------+
+| debian-template | (VMID 9001, generalized golden image)
++--------+---------+
+| cloned by Terraform
+v
++----------------+ +--------------+ +--------------+
+| home-k3s-control| | home-k3s-w1 | | home-k3s-w2 |
+| .241 | | .242 | | .243 |
++----------------+ +--------------+ +--------------+
+Configured and joined into a K3s cluster by Ansible
 
-┌─────────────────────────────────────────────────────────┐
-│ Proxmox VE Host │
-│ │
-│ ┌───────────────┐ │
-│ │ debian-template│ (VMID 9001, generalized golden image) │
-│ └───────┬───────┘ │
-│ │ cloned by Terraform │
-│ ▼ │
-│ ┌───────────────┐ ┌──────────────┐ ┌──────────────┐ │
-│ │ home-k3s- │ │ home-k3s-w1 │ │ home-k3s-w2 │ │
-│ │ control │ │ (worker) │ │ (worker) │ │
-│ │ .241 │ │ .242 │ │ .243 │ │
-│ └───────────────┘ └──────────────┘ └──────────────┘ │
-│ Configured and joined into a K3s cluster by Ansible │
-│ │
-│ ┌───────────────┐ │
-│ │ home-control │ Terraform + Ansible + git run here │
-│ │ .240 │ │
-│ └───────────────┘ │
-└─────────────────────────────────────────────────────────┘
-
++----------------+
+| home-control | Terraform + Ansible + git run here
+| .240 |
 
 ## Tech stack
 
@@ -37,7 +30,6 @@ built as a portfolio project during a Cloud Support & DevOps bootcamp.
 - **OS:** Debian 13 (Trixie)
 
 ## Repository structure
-
 homelab-iac/
 ├── main.tf # VM resource definitions (3 K3s nodes)
 ├── provider.tf # Terraform provider configuration
@@ -47,7 +39,6 @@ homelab-iac/
 │ ├── inventory.yml # K3s node inventory, grouped by role
 │ └── site.yml # K3s install + cluster join playbook
 └── README.md
-
 
 ## Key design decisions
 
