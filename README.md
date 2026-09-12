@@ -83,3 +83,8 @@ built as a portfolio project during a Cloud Support & DevOps bootcamp.
     terraform apply
     cd ansible
     ansible-playbook -i inventory.yml site.yml
+- **Host key checking disabled for Ansible (internal automation only).**
+  Discovered during a destroy/rebuild test that fresh clones generate new
+  SSH host keys, which broke unattended Ansible runs against a strict
+  known_hosts. Accepted trade-off for a fully-trusted internal LAN
+  automation context — not a pattern suitable for public-facing hosts.
