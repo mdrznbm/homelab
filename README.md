@@ -9,7 +9,7 @@ built as a portfolio project during a Cloud Support & DevOps bootcamp.
     Proxmox VE Host
 
     +------------------+
-    | debian-template  |  (VMID 9001, generalized golden image)
+    | debian-template  |  (generalized golden image, clone source)
     +---------+--------+
               | cloned by Terraform
               v
@@ -30,6 +30,8 @@ built as a portfolio project during a Cloud Support & DevOps bootcamp.
 - **Provisioning:** Terraform (`bpg/proxmox` provider)
 - **Configuration management:** Ansible
 - **Container orchestration:** K3s
+- **Ingress:** Traefik (K3s bundled default)
+- **Storage:** ZFS RAIDZ1 (3x HDD, `main` pool)
 - **OS:** Debian 13 (Trixie)
 
 ## Repository structure
@@ -41,8 +43,21 @@ built as a portfolio project during a Cloud Support & DevOps bootcamp.
     |-- terraform.tfvars     (Secrets - gitignored, never committed)
     |-- ansible/
     |   |-- inventory.yml    (K3s node inventory, grouped by role)
+    |   |-- ansible.cfg      (host_key_checking disabled - internal LAN only)
     |   `-- site.yml         (K3s install + cluster join playbook)
     `-- README.md
+
+## Project roadmap
+
+Each project is chosen to map to a specific, recognizable skill area:
+
+    | # | Project                          | What it demonstrates            |
+    |---|-----------------------------------|----------------------------------|
+    | 1 | Terraform + Ansible + K3s         | Infrastructure automation       |
+    | 2 | Nextcloud                         | Application hosting and storage |
+    | 3 | Prometheus + Grafana + Loki       | Monitoring and observability    |
+    | 4 | ArgoCD                            | GitOps and deployment mgmt      |
+    | 5 | Custom app + CI pipeline (TBD)    | CI/CD, feeds Project 4          |
 
 ## Key design decisions
 
@@ -65,16 +80,35 @@ built as a portfolio project during a Cloud Support & DevOps bootcamp.
 - **PostgreSQL is the default database** for any service that needs
   one, chosen for portability to a managed cloud database later if
   ever needed.
+- **Host key checking disabled for Ansible (internal automation only).**
+  Discovered during a destroy/rebuild test that fresh clones generate new
+  SSH host keys, which broke unattended Ansible runs against a strict
+  known_hosts. Accepted trade-off for a fully-trusted internal LAN
+  automation context — not a pattern suitable for public-facing hosts.
+- **ZFS storage is managed manually, not via Terraform.** A one-time,
+  destructive, host-level operation was deliberately kept out of the
+  automated pipeline to avoid the risk of Terraform ever re-provisioning
+  (and wiping) real family data on every apply.
+- **Traefik (K3s's bundled default) was kept as the ingress controller**
+  rather than replacing it — already installed and running, and a
+  legitimate real-world choice on its own merits, not just the path of
+  least resistance.
 
 ## Status
 
-- [x] Debian template built, generalized, and DNS-hardened
+- [x] Debian template built, generalized, DNS-hardened, and
+      cleaned of stale login history
 - [x] Dedicated control VM (`home-control`) with Terraform, Ansible, git
 - [x] 3 K3s node VMs provisioned via Terraform
 - [x] K3s cluster installed and joined via Ansible — **live and working**
-- [ ] ZFS RAIDZ1 bulk storage pool
-- [ ] Ingress strategy
-- [ ] Family-facing services (Immich/Nextcloud, monitoring, etc.)
+- [x] Full destroy/rebuild reproducibility test passed
+- [x] ZFS RAIDZ1 pool verified healthy, per-service datasets created
+- [x] Ingress (Traefik) confirmed running
+- [x] **Project 1: COMPLETE**
+- [ ] Project 2: Nextcloud
+- [ ] Project 3: Prometheus + Grafana + Loki
+- [ ] Project 4: ArgoCD
+- [ ] Project 5: TBD (custom app + CI pipeline feeding ArgoCD)
 
 ## Reproducing this cluster
 
@@ -83,8 +117,3 @@ built as a portfolio project during a Cloud Support & DevOps bootcamp.
     terraform apply
     cd ansible
     ansible-playbook -i inventory.yml site.yml
-- **Host key checking disabled for Ansible (internal automation only).**
-  Discovered during a destroy/rebuild test that fresh clones generate new
-  SSH host keys, which broke unattended Ansible runs against a strict
-  known_hosts. Accepted trade-off for a fully-trusted internal LAN
-  automation context — not a pattern suitable for public-facing hosts.
