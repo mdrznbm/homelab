@@ -45,3 +45,12 @@
         K3S_TOKEN={{ k3s_token }}
         sh -
       when: not k3s_agent_installed.stat.exists
+- name: Ensure NFS client support is installed on all nodes
+  hosts: all
+  become: true
+  tasks:
+    - name: Install nfs-common
+      ansible.builtin.apt:
+        name: nfs-common
+        state: present
+        update_cache: true
