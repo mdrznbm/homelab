@@ -21,6 +21,8 @@ spec:
           env:
             - name: POSTGRES_HOST
               value: postgres
+            - name: TRUSTED_DOMAINS
+              value: "nextcloud.home.lab"
             - name: POSTGRES_DB
               valueFrom:
                 secretKeyRef:
