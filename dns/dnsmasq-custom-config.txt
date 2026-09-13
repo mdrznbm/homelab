@@ -4,3 +4,6 @@ server=8.8.8.8
 
 # Our custom local hostnames
 address=/nextcloud.home.lab/192.168.1.241
+local-service
+interface=eth0
+interface=tailscale0
