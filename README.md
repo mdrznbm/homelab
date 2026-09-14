@@ -62,6 +62,8 @@ built as a portfolio project during a Cloud Support & DevOps bootcamp.
     |   `-- nextcloud-ingress.yaml    (Traefik host-based routing)
     |-- dns/
     |   `-- dnsmasq-custom-config.txt (reference copy of local DNS config)
+    |-- docs/
+    |   `-- family-onboarding-checklist.md
     `-- README.md
 
 ## Project roadmap
@@ -101,58 +103,54 @@ Each project is chosen to map to a specific, recognizable skill area:
   the pool already existed at the host level. PostgreSQL deliberately
   does NOT use this NFS storage — its known unreliable file-locking
   semantics are a real risk to database integrity — and instead uses
-  K3s's local-path storage class, which Postgres's single-pod access
-  pattern doesn't need NFS's multi-pod capability for anyway.
+  K3s's local-path storage class.
 - **Host key checking disabled for Ansible (internal automation only).**
   Discovered during a destroy/rebuild test that fresh clones generate new
   SSH host keys, which broke unattended Ansible runs against a strict
   known_hosts. Accepted trade-off for a fully-trusted internal LAN
-  automation context — not a pattern suitable for public-facing hosts.
+  automation context.
 - **ZFS storage is managed manually, not via Terraform.** A one-time,
   destructive, host-level operation was deliberately kept out of the
-  automated pipeline to avoid the risk of Terraform ever re-provisioning
-  (and wiping) real family data on every apply.
+  automated pipeline.
 - **Traefik (K3s's bundled default) was kept as the ingress controller**
-  rather than replacing it — already installed and running, and a
-  legitimate real-world choice on its own merits.
-- **Local DNS (dnsmasq) runs on home-control, not inside K3s.**
-  A foundational, always-needed service should not go down every time
-  the cluster is destroyed and rebuilt for testing — the same reasoning
-  applied to NFS.
-- **Remote access via Tailscale, not port forwarding.** Tailscale makes
-  only outbound connections and exposes no public listening port;
-  access is gated by authentication into a private tailnet rather than
-  by network discoverability. Configured as a subnet router on
-  home-control (not directly on Proxmox, to avoid putting
-  internet-facing software on the single most privileged machine in
-  the homelab) so every current and future service becomes remotely
-  reachable through one setup.
+  rather than replacing it.
+- **Local DNS (dnsmasq) and remote access (Tailscale) both run on
+  home-control**, not inside K3s and not directly on Proxmox — a
+  foundational service shouldn't go down with the cluster during
+  testing, and internet-facing software was kept off the single most
+  privileged machine in the homelab.
+- **Remote access via Tailscale, not port forwarding.** No public
+  listening port is ever exposed; access is gated by authentication
+  into a private tailnet.
 
 ## Status
 
-- [x] Debian template built, generalized, DNS-hardened, and
-      cleaned of stale login history
-- [x] Dedicated control VM (`home-control`) with Terraform, Ansible, git
-- [x] 3 K3s node VMs provisioned via Terraform
-- [x] K3s cluster installed and joined via Ansible — **live and working**
-- [x] Full destroy/rebuild reproducibility test passed
-- [x] ZFS RAIDZ1 pool verified healthy, per-service datasets created
-- [x] Ingress (Traefik) confirmed running
-- [x] **Project 1: COMPLETE**
-- [x] NFS storage bridge (ZFS -> K3s) built and verified
-- [x] PostgreSQL deployed for Nextcloud
-- [x] Nextcloud deployed, connected to storage and database
-- [x] Local DNS (dnsmasq) + Traefik Ingress — nextcloud.home.lab
-      working on the home network
-- [x] Family account structure established (admin / regular / group)
-- [x] Remote access via Tailscale — verified working off-network,
-      on cellular data, with home Wi-Fi disabled
-- [ ] Family-onboarding checklist (written, reusable)
-- [ ] Remaining family members onboarded
-- [ ] Backup-of-the-backup strategy for NFS-backed data
+- [x] **Project 1: COMPLETE** — Terraform + Ansible + K3s cluster,
+      fully tested (including a destroy/rebuild reproducibility test),
+      version-controlled and documented
+- [x] **Project 2: COMPLETE** — Nextcloud live and accessible both on
+      the home network and remotely via Tailscale, with proper
+      admin/regular account separation and a written family
+      onboarding checklist
 - [ ] Project 3: Prometheus + Grafana + Loki
 - [ ] Project 4: ArgoCD
 - [ ] Project 5: TBD (custom app + CI pipeline feeding ArgoCD)
+
+## Pending / Deferred
+
+Items that are known and tracked, but deliberately set aside to
+revisit after Projects 3–5 are further along:
+
+- Genuine off-network verification of the career-event laptop (tested
+  so far only while on the home network, on both dual-boot OSes)
+- Onboarding remaining family members (checklist ready; deferred —
+  they are currently overseas)
+- A second, independent backup of Nextcloud's data (the ZFS RAIDZ1
+  pool protects against a disk failing, not against accidental
+  deletion or corruption). Best destination is an incoming Synology
+  or UGREEN NAS, not yet received — revisit once hardware arrives
+- Removing bootcamp-era per-VM Tailscale entries, planned alongside
+  their Proxmox VM deletion after the 7 Oct bootcamp presentation
 
 ## Reproducing this cluster
 
