@@ -18,10 +18,11 @@ built as a portfolio project during a Cloud Support & DevOps bootcamp.
     |      .241        |  |    .242      |  |    .243      |
     +------------------+  +--------------+  +--------------+
          Configured and joined into a K3s cluster by Ansible
-         Runs: Traefik ingress, Nextcloud, PostgreSQL
+         Runs: Traefik ingress, Nextcloud, PostgreSQL,
+               Prometheus, Grafana, Loki, Promtail
 
     +------------------+
-    |   home-control   |  Terraform + Ansible + git run here
+    |   home-control   |  Terraform + Ansible + Helm + git run here
     |      .240        |  Also runs: dnsmasq (local DNS),
     |                  |  Tailscale (subnet router, remote access)
     +------------------+
@@ -34,12 +35,14 @@ built as a portfolio project during a Cloud Support & DevOps bootcamp.
 - **Hypervisor:** Proxmox VE
 - **Provisioning:** Terraform (`bpg/proxmox` provider)
 - **Configuration management:** Ansible
+- **Package management (K8s):** Helm
 - **Container orchestration:** K3s
 - **Ingress:** Traefik (K3s bundled default)
 - **Storage:** ZFS RAIDZ1 (3x HDD, `main` pool) exported via NFS
 - **Local DNS:** dnsmasq (runs on home-control)
 - **Remote access:** Tailscale (subnet router on home-control)
 - **Application (Project 2):** Nextcloud + PostgreSQL
+- **Observability (Project 3):** Prometheus + Grafana + Loki + Promtail
 - **OS:** Debian 13 (Trixie)
 
 ## Repository structure
@@ -52,7 +55,7 @@ built as a portfolio project during a Cloud Support & DevOps bootcamp.
     |-- ansible/
     |   |-- inventory.yml    (K3s node inventory, grouped by role)
     |   |-- ansible.cfg      (host_key_checking disabled - internal LAN only)
-    |   `-- site.yml         (K3s install, cluster join, nfs-common)
+    |   `-- site.yml         (K3s install, cluster join, nfs-common, disable IPv6)
     |-- k8s/
     |   |-- nextcloud-pv.yaml         (NFS-backed PersistentVolume)
     |   |-- nextcloud-pvc.yaml        (statically bound PVC)
@@ -60,6 +63,11 @@ built as a portfolio project during a Cloud Support & DevOps bootcamp.
     |   |-- postgres-deployment.yaml  (PostgreSQL Deployment + Service)
     |   |-- nextcloud-deployment.yaml (Nextcloud Deployment + Service)
     |   `-- nextcloud-ingress.yaml    (Traefik host-based routing)
+    |-- monitoring/
+    |   |-- values.yaml              (kube-prometheus-stack Helm values)
+    |   |-- loki-values.yaml         (Loki Helm values, SingleBinary mode)
+    |   |-- promtail-values.yaml     (Promtail Helm values)
+    |   `-- grafana-ingress.yaml     (Traefik host-based routing)
     |-- dns/
     |   `-- dnsmasq-custom-config.txt (reference copy of local DNS config)
     |-- docs/
@@ -89,31 +97,38 @@ Each project is chosen to map to a specific, recognizable skill area:
   static IPs are set directly via cloud-init instead.
 - **No true HA on the control plane.** With a single physical Proxmox
   host, the hardware itself is a single point of failure regardless of
-  node count — so a single control-plane node was chosen deliberately,
-  rather than faking HA with 3 control-plane VMs that would still all
-  go down together.
+  node count — so a single control-plane node was chosen deliberately.
 - **Terraform and Ansible are kept separate**, not fused via
   provisioners. Terraform provisions infrastructure (declarative,
   state-based); Ansible configures it (procedural, re-runnable).
 - **PostgreSQL is the default database** for any service that needs
-  one, chosen for portability to a managed cloud database later if
-  ever needed.
+  one, chosen for portability to a managed cloud database later.
 - **NFS bridges host-level ZFS storage into K3s**, running directly
-  on the Proxmox host rather than a dedicated passthrough VM, since
-  the pool already existed at the host level. PostgreSQL deliberately
-  does NOT use this NFS storage — its known unreliable file-locking
-  semantics are a real risk to database integrity — and instead uses
-  K3s's local-path storage class.
+  on the Proxmox host. PostgreSQL deliberately does NOT use this NFS
+  storage — its file-locking semantics are a real risk to database
+  integrity — and uses K3s's local-path storage class instead.
+- **Loki uses filesystem storage mode, not object storage.** A full
+  MinIO/S3-compatible deployment was judged unnecessary complexity at
+  this log volume; filesystem mode is a genuinely supported Loki
+  deployment pattern for single-node setups, not a shortcut.
+- **IPv6 disabled cluster-wide.** The home network has no working IPv6
+  route; DNS was still returning IPv6 addresses for external
+  registries (e.g. quay.io), causing every image pull to waste time
+  failing through unreachable IPv6 addresses before falling back to
+  IPv4. Disabled via Ansible (sysctl) across all 3 nodes.
+- **Chart defaults are trimmed to actual cluster capacity, not
+  accepted blindly.** Loki's bundled memcached cache requested ~9.6GB
+  of RAM (more than an entire worker node has) and was disabled;
+  Prometheus/Grafana/Loki storage sizes and retention were all
+  deliberately sized against real node capacity rather than left at
+  chart defaults sized for larger clusters.
 - **Host key checking disabled for Ansible (internal automation only).**
-  Discovered during a destroy/rebuild test that fresh clones generate new
-  SSH host keys, which broke unattended Ansible runs against a strict
-  known_hosts. Accepted trade-off for a fully-trusted internal LAN
-  automation context.
-- **ZFS storage is managed manually, not via Terraform.** A one-time,
-  destructive, host-level operation was deliberately kept out of the
-  automated pipeline.
-- **Traefik (K3s's bundled default) was kept as the ingress controller**
-  rather than replacing it.
+  A fresh clone's new SSH host keys broke unattended Ansible runs
+  against a strict known_hosts; accepted as a trade-off for a
+  fully-trusted internal LAN automation context.
+- **ZFS storage is managed manually, not via Terraform** — a
+  destructive, host-level operation deliberately kept out of the
+  automated apply/destroy cycle.
 - **Local DNS (dnsmasq) and remote access (Tailscale) both run on
   home-control**, not inside K3s and not directly on Proxmox — a
   foundational service shouldn't go down with the cluster during
@@ -132,14 +147,16 @@ Each project is chosen to map to a specific, recognizable skill area:
       the home network and remotely via Tailscale, with proper
       admin/regular account separation and a written family
       onboarding checklist
-- [ ] Project 3: Prometheus + Grafana + Loki
+- [x] **Project 3: COMPLETE** — Prometheus, Grafana, and Loki deployed
+      via Helm, all verified with real data (live cluster dashboards,
+      genuine application logs), reachable at grafana.home.lab
 - [ ] Project 4: ArgoCD
 - [ ] Project 5: TBD (custom app + CI pipeline feeding ArgoCD)
 
 ## Pending / Deferred
 
 Items that are known and tracked, but deliberately set aside to
-revisit after Projects 3–5 are further along:
+revisit after Projects 4-5 are further along:
 
 - Genuine off-network verification of the career-event laptop (tested
   so far only while on the home network, on both dual-boot OSes)
@@ -166,7 +183,18 @@ revisit after Projects 3–5 are further along:
     kubectl apply -f postgres-deployment.yaml
     kubectl apply -f nextcloud-deployment.yaml
     kubectl apply -f nextcloud-ingress.yaml
+    cd ../monitoring
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+    helm repo add grafana https://grafana.github.io/helm-charts
+    helm repo update
+    helm install monitoring prometheus-community/kube-prometheus-stack -n monitoring -f values.yaml
+    helm install loki grafana/loki -n monitoring -f loki-values.yaml
+    helm install promtail grafana/promtail -n monitoring -f promtail-values.yaml
+    kubectl apply -f grafana-ingress.yaml
 
 Note: the NFS export (Proxmox host) and dnsmasq/Tailscale config
 (home-control) are manual, host-level setup steps, documented in
-dns/ and this README, but not Terraform/Ansible-managed.
+dns/ and this README, but not Terraform/Ansible-managed. The
+monitoring namespace and various Secrets (grafana-admin-secret,
+nextcloud-admin-secret, nextcloud-db-secret) must be created via
+kubectl before applying the above.
